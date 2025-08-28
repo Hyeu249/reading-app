@@ -11,7 +11,7 @@ export default function ScrollViewDemo() {
   const { theme } = useReadingContext();
   return (
     <Theme name={theme}>
-      <XStack flex={1} backgroundColor={"$background"}>
+      <XStack flex={1}>
         <YStack width={"24%"} padding={15}>
           <ReadingOptions />
         </YStack>
