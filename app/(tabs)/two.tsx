@@ -1,49 +1,182 @@
-import { StyleSheet } from "react-native";
+import React, { useState, useRef, useEffect } from "react";
+import { View, Text, Button, ScrollView, StyleSheet } from "react-native";
 
-import EditScreenInfo from "@/components/EditScreenInfo";
-import { Text, View } from "@/components/Themed";
-import TextSpeaker from "@/components/TextSpeaker";
-import TextSpeakHighlight from "@/components/TextSpeakHighlight";
+// ✅ API Functions
+export async function start_read_rfids(ip_address: string) {
+  try {
+    const res = await fetch(
+      `${ip_address}/InventoryController/startInventoryRequest`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          type: "Reader-startInventoryRequest",
+          backgroundInventory: "false",
+          tagFilter: {
+            tagMemoryBank: "epc",
+            bitOffset: 0,
+            bitLength: 0,
+            hexMask: null,
+          },
+        }),
+      }
+    );
 
-const vi = [
-  "Số phận của Cycling Anh đã thay đổi vào một ngày vào năm 2003.",
-  "Tổ chức này, vốn là cơ quan quản lý xe đạp chuyên nghiệp ở Vương quốc Anh, vừa mới thuê Dave Brailsford làm giám đốc hiệu suất mới.",
-  "Vào thời điểm đó, các vận động viên xe đạp chuyên nghiệp ở Vương quốc Anh đã phải chịu đựng gần một trăm năm của sự tầm thường.",
-];
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return await res.json();
+  } catch (error) {
+    console.error("API Error:", error);
+    return false;
+  }
+}
 
-const en = [
-  "the fate of British Cycling changed one day in 2003.",
-  "The organi‑ zation, which was the governing body for professional cycling in Great Britain, had recently hired Dave Brailsford as its new perfor‑ mance director.",
-  "At the time, professional cyclists in Great Britain had endured nearly one hundred years of mediocrity.",
-];
+export async function stop_read_rfids(ip_address: string) {
+  try {
+    const res = await fetch(
+      `${ip_address}/InventoryController/stopInventoryRequest`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ type: "Reader-stopInventoryRequest" }),
+      }
+    );
 
-export default function TabTwoScreen() {
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return await res.json();
+  } catch (error) {
+    console.error("API Error:", error);
+    return false;
+  }
+}
+
+export async function tagReportingDataAndIndex(ip_address: string) {
+  try {
+    const res = await fetch(
+      `${ip_address}/InventoryController/tagReportingDataAndIndex`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+      }
+    );
+
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    return data.data;
+  } catch (error) {
+    console.error("API Error:", error);
+    return [];
+  }
+}
+
+export async function clearCacheTagAndIndex(ip_address: string) {
+  try {
+    await fetch(`${ip_address}/InventoryController/clearCacheTagAndIndex`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+    });
+    return true;
+  } catch (error) {
+    console.error("API Error:", error);
+    return false;
+  }
+}
+
+// ✅ URLs
+const url = "http://192.168.11.16:5000";
+
+export default function TagReaderScreen() {
+  const [tags, setTags] = useState<string[]>([]);
+  const intervalRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    const init = async () => {
+      await clearCacheTagAndIndex(url);
+    };
+    init();
+  }, []);
+
+  const fetchTags = async (): Promise<void> => {
+    try {
+      const res = await tagReportingDataAndIndex(url);
+      const data = res.map((e: any) => e.epcHex);
+
+      setTags((prevTags) => {
+        const newTags = data.filter((tag: string) => !prevTags.includes(tag));
+        return [...prevTags, ...newTags];
+      });
+
+      // ✅ Clear cache ngay sau khi đọc để giảm duplicate
+      if (data.length > 0) {
+        await clearCacheTagAndIndex(url);
+      }
+    } catch (error) {
+      console.error("Error fetching tags:", error);
+    }
+  };
+
+  const handleStart = async () => {
+    await start_read_rfids(url);
+    handleRead();
+  };
+
+  const handleStop = (): void => {
+    stop_read_rfids(url);
+    if (intervalRef.current) {
+      clearTimeout(intervalRef.current);
+      intervalRef.current = null;
+    }
+  };
+
+  const handleRead = async (): Promise<void> => {
+    if (intervalRef.current) return; // tránh nhiều interval
+
+    const poll = async () => {
+      await fetchTags();
+      intervalRef.current = setTimeout(poll, 200) as unknown as number; // đợi xong mới gọi tiếp
+    };
+
+    poll();
+  };
+
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Tab Two</Text>
-      <TextSpeakHighlight vi={vi} en={en} />
-      <View
-        style={styles.separator}
-        lightColor="#eee"
-        darkColor="rgba(255,255,255,0.1)"
-      />
+      <View style={styles.buttonContainer}>
+        <Button title="Start" onPress={handleStart} />
+        <Button title="Stop" onPress={handleStop} />
+      </View>
+      <View style={styles.buttonContainer}>
+        <Text>Length: {tags.length}</Text>
+      </View>
+      <ScrollView style={styles.chatBox}>
+        {tags.map((tag, index) => (
+          <View key={index} style={styles.message}>
+            <Text style={styles.messageText}>{tag}</Text>
+          </View>
+        ))}
+      </ScrollView>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  container: { flex: 1, padding: 20, backgroundColor: "#fff" },
+  buttonContainer: {
+    flexDirection: "row",
+    justifyContent: "space-around",
+    marginBottom: 20,
+  },
+  chatBox: {
     flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
+    backgroundColor: "#f1f1f1",
+    borderRadius: 8,
+    padding: 10,
   },
-  title: {
-    fontSize: 20,
-    fontWeight: "bold",
+  message: {
+    backgroundColor: "#e0e0e0",
+    padding: 10,
+    borderRadius: 8,
+    marginBottom: 10,
+    alignSelf: "flex-start",
   },
-  separator: {
-    marginVertical: 30,
-    height: 1,
-    width: "80%",
-  },
+  messageText: { fontSize: 16, color: "#333" },
 });
