@@ -5,11 +5,23 @@ import { Text, View } from "@/components/Themed";
 import TextSpeaker from "@/components/TextSpeaker";
 import TextSpeakHighlight from "@/components/TextSpeakHighlight";
 
+const vi = [
+  "Số phận của Cycling Anh đã thay đổi vào một ngày vào năm 2003.",
+  "Tổ chức này, vốn là cơ quan quản lý xe đạp chuyên nghiệp ở Vương quốc Anh, vừa mới thuê Dave Brailsford làm giám đốc hiệu suất mới.",
+  "Vào thời điểm đó, các vận động viên xe đạp chuyên nghiệp ở Vương quốc Anh đã phải chịu đựng gần một trăm năm của sự tầm thường.",
+];
+
+const en = [
+  "the fate of British Cycling changed one day in 2003.",
+  "The organi‑ zation, which was the governing body for professional cycling in Great Britain, had recently hired Dave Brailsford as its new perfor‑ mance director.",
+  "At the time, professional cyclists in Great Britain had endured nearly one hundred years of mediocrity.",
+];
+
 export default function TabTwoScreen() {
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Tab Two</Text>
-      <TextSpeakHighlight text="My favorite hobby is reading books. I enjoy reading because it helps me learn new things and improve my imagination. Every day, I spend about one hour reading novels or short stories. Sometimes I read in the morning, but I usually read before going to bed. Reading makes me feel relaxed and happy. It is the best way for me to reduce stress after a long day." />
+      <TextSpeakHighlight vi={vi} en={en} />
       <View
         style={styles.separator}
         lightColor="#eee"

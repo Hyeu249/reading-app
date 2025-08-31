@@ -1,43 +1,47 @@
 import React, { useState, useEffect } from "react";
-import { View, Text, Button, StyleSheet } from "react-native";
+import { View, Text, Button, StyleSheet, ScrollView } from "react-native";
 import * as Speech from "expo-speech";
 import Dropdown from "@/components/DropDown";
 
-const SpeakingText = ({ text }: { text: string }) => {
+const SpeakingText = ({ en, vi }: { en: string[]; vi: string[] }) => {
   const [voices, setVoices] = useState<{ label: string; value: string }[]>([]);
   const [voice, setVoice] = useState("");
   const [startStatus, setStartStatus] = useState<"start" | "stop">("stop");
   const [resumeStatus, setResumeStatus] = useState<"pause" | "resume">(
     "resume"
   );
-  const [currentWordIndex, setCurrentWordIndex] = useState<number | null>(null);
-  const words = text.split(/\s+/); // Tách theo khoảng trắng
 
-  const speak = () => {
+  const [currentSentenceIndex, setCurrentSentenceIndex] = useState<number>(-1);
+  const [currentWordIndex, setCurrentWordIndex] = useState<number | null>(null);
+
+  const speak = async () => {
+    setCurrentSentenceIndex(-1);
     setCurrentWordIndex(null);
 
-    Speech.speak(text, {
-      voice: voice,
-      onBoundary: (event: any) => {
-        if (event.name === "word") {
-          // Đếm số khoảng trắng trước charIndex để tìm index của từ
-          const wordIndex =
-            event.target.text.slice(0, event.charIndex).split(/\s+/).length - 1;
-          setCurrentWordIndex(wordIndex);
-        }
-      },
-      onDone: () => {
-        setCurrentWordIndex(null);
-      },
-    });
-  };
+    for (let i = 0; i < en.length; i++) {
+      setCurrentSentenceIndex(i);
+      setCurrentWordIndex(null);
 
-  const resume = () => {
-    Speech.resume();
-  };
+      await new Promise<void>((resolve) => {
+        Speech.speak(en[i], {
+          voice: voice || undefined,
+          onBoundary: (event: any) => {
+            if (event.name === "word") {
+              const wordIndex =
+                event.target.text.slice(0, event.charIndex).split(/\s+/)
+                  .length - 1;
+              setCurrentWordIndex(wordIndex);
+            }
+          },
+          onDone: () => {
+            setCurrentWordIndex(null);
+            resolve();
+          },
+        });
+      });
+    }
 
-  const pause = () => {
-    Speech.pause();
+    setCurrentSentenceIndex(-1);
   };
 
   const handleStart = () => {
@@ -48,9 +52,11 @@ const SpeakingText = ({ text }: { text: string }) => {
       Speech.stop();
       setStartStatus("stop");
       setResumeStatus("resume");
+      setCurrentSentenceIndex(-1);
       setCurrentWordIndex(null);
     }
   };
+
   const handleResume = () => {
     if (startStatus === "stop") return;
     if (resumeStatus !== "pause") {
@@ -69,24 +75,43 @@ const SpeakingText = ({ text }: { text: string }) => {
         voicesList.map((e) => ({ label: e.name, value: e.identifier }))
       );
     };
-
     fetchVoices();
   }, []);
 
   return (
-    <View style={styles.container}>
+    <ScrollView style={styles.container}>
       <View style={styles.textContainer}>
-        {words.map((word, index) => (
-          <Text
-            key={index}
-            style={[
-              styles.word,
-              index === currentWordIndex && styles.highlightWord,
-            ]}
-          >
-            {word}{" "}
-          </Text>
-        ))}
+        {en.map((sentence, sIndex) => {
+          const words = sentence.split(/\s+/);
+          return (
+            <View key={sIndex} style={styles.sentenceBlock}>
+              <View style={styles.sentenceRow}>
+                {words.map((word, wIndex) => (
+                  <Text
+                    key={wIndex}
+                    style={[
+                      styles.word,
+                      sIndex === currentSentenceIndex &&
+                        wIndex === currentWordIndex &&
+                        styles.highlightWord,
+                    ]}
+                  >
+                    {word}{" "}
+                  </Text>
+                ))}
+              </View>
+              <Text
+                style={[
+                  styles.translation,
+                  sIndex === currentSentenceIndex &&
+                    styles.highlightTranslation,
+                ]}
+              >
+                {vi[sIndex]}
+              </Text>
+            </View>
+          );
+        })}
       </View>
       <Dropdown
         label="Chọn giọng đọc"
@@ -108,31 +133,47 @@ const SpeakingText = ({ text }: { text: string }) => {
           color="#F44336"
         />
       </View>
-    </View>
+    </ScrollView>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     padding: 20,
-    alignItems: "center",
     width: "100%",
-    gap: 20,
   },
   textContainer: {
+    flexDirection: "column",
+    gap: 20,
+  },
+  sentenceBlock: {
+    marginBottom: 20,
+  },
+  sentenceRow: {
     flexDirection: "row",
     flexWrap: "wrap",
-    justifyContent: "center",
   },
   word: {
-    fontSize: 20,
+    fontSize: 18,
     color: "#333",
   },
   highlightWord: {
     color: "#FF5722",
+    fontWeight: "bold",
+  },
+  translation: {
+    fontSize: 16,
+    color: "#555",
+    marginTop: 4,
+  },
+  highlightTranslation: {
+    color: "#2196F3",
+    fontWeight: "bold",
   },
   buttonContainer: {
     flexDirection: "row",
+    justifyContent: "center",
+    marginTop: 20,
     gap: 10,
   },
   dropdown: {
@@ -143,6 +184,7 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     borderRadius: 6,
     minWidth: 270,
+    marginTop: 20,
   },
 });
 
