@@ -1,14 +1,15 @@
 import React, { useState, useRef, useEffect } from "react";
 import { View, Text, Button, ScrollView, StyleSheet } from "react-native";
 
-// ✅ API Functions
-export async function start_read_rfids(ip_address: string) {
+export async function start_read_rfids(ip_adress: string) {
   try {
     const res = await fetch(
-      `${ip_address}/InventoryController/startInventoryRequest`,
+      `${ip_adress}/InventoryController/startInventoryRequest`,
       {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
+        method: "POST", // Hoặc "GET"
+        headers: {
+          "Content-Type": "application/json",
+        },
         body: JSON.stringify({
           type: "Reader-startInventoryRequest",
           backgroundInventory: "false",
@@ -21,9 +22,13 @@ export async function start_read_rfids(ip_address: string) {
         }),
       }
     );
+    if (!res.ok) {
+      // Không phải 2xx (ví dụ 500, 400)
+      throw new Error(`HTTP ${res.status}`);
+    }
 
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    return await res.json();
+    const data = await res.json();
+    return data;
   } catch (error) {
     console.error("API Error:", error);
     return false;
@@ -36,13 +41,20 @@ export async function stop_read_rfids(ip_address: string) {
       `${ip_address}/InventoryController/stopInventoryRequest`,
       {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+        },
         body: JSON.stringify({ type: "Reader-stopInventoryRequest" }),
       }
     );
 
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    return await res.json();
+    if (!res.ok) {
+      // Không phải 2xx (ví dụ 500, 400)
+      throw new Error(`HTTP ${res.status}`);
+    }
+
+    const data = await res.json();
+    return data;
   } catch (error) {
     console.error("API Error:", error);
     return false;
@@ -54,13 +66,19 @@ export async function tagReportingDataAndIndex(ip_address: string) {
     const res = await fetch(
       `${ip_address}/InventoryController/tagReportingDataAndIndex`,
       {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
+        method: "POST", // Hoặc "GET"
+        headers: {
+          "Content-Type": "application/json",
+        },
       }
     );
+    if (!res.ok) {
+      // Không phải 2xx (ví dụ 500, 400)
+      throw new Error(`HTTP ${res.status}`);
+    }
 
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();
+
     return data.data;
   } catch (error) {
     console.error("API Error:", error);
@@ -70,10 +88,15 @@ export async function tagReportingDataAndIndex(ip_address: string) {
 
 export async function clearCacheTagAndIndex(ip_address: string) {
   try {
-    await fetch(`${ip_address}/InventoryController/clearCacheTagAndIndex`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-    });
+    const res = await fetch(
+      `${ip_address}/InventoryController/clearCacheTagAndIndex`,
+      {
+        method: "POST", // Hoặc "GET"
+        headers: {
+          "Content-Type": "application/json",
+        },
+      }
+    );
     return true;
   } catch (error) {
     console.error("API Error:", error);
@@ -81,12 +104,13 @@ export async function clearCacheTagAndIndex(ip_address: string) {
   }
 }
 
-// ✅ URLs
+const url1 = "https://thanh.bhieu.com/ur3";
+const url2 = "http://14.161.34.83:8082";
 const url = "http://192.168.11.16:5000";
 
 export default function TagReaderScreen() {
   const [tags, setTags] = useState<string[]>([]);
-  const intervalRef = useRef<number | null>(null);
+  const intervalRef = useRef<number | null>(null); // 👈 Fix here
 
   useEffect(() => {
     const init = async () => {
@@ -102,13 +126,8 @@ export default function TagReaderScreen() {
 
       setTags((prevTags) => {
         const newTags = data.filter((tag: string) => !prevTags.includes(tag));
-        return [...prevTags, ...newTags];
+        return [...prevTags, ...newTags]; // chỉ thêm tag chưa có
       });
-
-      // ✅ Clear cache ngay sau khi đọc để giảm duplicate
-      if (data.length > 0) {
-        await clearCacheTagAndIndex(url);
-      }
     } catch (error) {
       console.error("Error fetching tags:", error);
     }
@@ -122,20 +141,15 @@ export default function TagReaderScreen() {
   const handleStop = (): void => {
     stop_read_rfids(url);
     if (intervalRef.current) {
-      clearTimeout(intervalRef.current);
+      clearInterval(intervalRef.current);
       intervalRef.current = null;
     }
   };
 
-  const handleRead = async (): Promise<void> => {
-    if (intervalRef.current) return; // tránh nhiều interval
-
-    const poll = async () => {
-      await fetchTags();
-      intervalRef.current = setTimeout(poll, 200) as unknown as number; // đợi xong mới gọi tiếp
-    };
-
-    poll();
+  const handleRead = (): void => {
+    if (!intervalRef.current) {
+      intervalRef.current = setInterval(fetchTags, 200) as unknown as number;
+    }
   };
 
   return (
@@ -159,7 +173,11 @@ export default function TagReaderScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, padding: 20, backgroundColor: "#fff" },
+  container: {
+    flex: 1,
+    padding: 20,
+    backgroundColor: "#fff",
+  },
   buttonContainer: {
     flexDirection: "row",
     justifyContent: "space-around",
@@ -178,5 +196,8 @@ const styles = StyleSheet.create({
     marginBottom: 10,
     alignSelf: "flex-start",
   },
-  messageText: { fontSize: 16, color: "#333" },
+  messageText: {
+    fontSize: 16,
+    color: "#333",
+  },
 });
